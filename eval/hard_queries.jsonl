@@ -1,0 +1,26 @@
+{"query_id": "h01", "tier": "X", "type": "abstain", "query": "متى تصل الباخرة تيتانيك؟", "gloss": "When does the ship Titanic arrive? (no such ship in the table)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h02", "tier": "X", "type": "abstain", "query": "من هو وكيل الباخرة كوين ماري؟", "gloss": "Who is the agent of the Queen Mary? (no such ship)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h03", "tier": "X", "type": "abstain", "query": "ما نص المادة الخامسة عشرة من قانون البلدية؟", "gloss": "What does article 15 of the municipality law say? (pages hold 1-6 and 23-26)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h04", "tier": "X", "type": "abstain", "query": "كم دعوى نظرت المحاكم في سنة ١٩٥٠؟", "gloss": "How many cases did the courts hear in 1950? (only 1953 and 1954 are given)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h05", "tier": "X", "type": "abstain", "query": "من هو رئيس ديوان المحاسبة في الكويت؟", "gloss": "Who heads Kuwait's audit office? (never named)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h06", "tier": "X", "type": "abstain", "query": "متى أنشئت محكمة الحسابات في فرنسا؟", "gloss": "When was France's court of accounts founded? (no date given)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h07", "tier": "X", "type": "abstain", "query": "كم تبلغ رسوم رخصة حق ممارسة العمل؟", "gloss": "How much is the work permit fee? (no fee given)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h08", "tier": "X", "type": "abstain", "query": "كم يبلغ راتب المفتش العام؟", "gloss": "What is the inspector general's salary?", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h09", "tier": "X", "type": "abstain", "query": "متى يسافر الطيارون الى امريكا؟", "gloss": "When do the pilots travel to America? (they go to England)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h10", "tier": "X", "type": "abstain", "query": "كم طنا من الاسمنت وصل في شهر اكتوبر؟", "gloss": "How many tons of cement arrived in October? (the report covers November)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h11", "tier": "X", "type": "abstain", "query": "من فاز بالقسيمة رقم ٥٠ في منطقة ب؟", "gloss": "Who won plot number 50 in area B? (winners are not named)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h12", "tier": "X", "type": "abstain", "query": "ما هو عنوان مكتب البلدية؟", "gloss": "What is the municipality office's address?", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h13", "tier": "X", "type": "abstain", "query": "كل ما نشر في عدد ١١ ديسمبر ١٩٥٤", "gloss": "Everything in the issue of 11 December 1954 (no such issue)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h14", "tier": "X", "type": "abstain", "query": "كم عدد المدارس في الكويت؟", "gloss": "How many schools are there in Kuwait?", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h15", "tier": "X", "type": "abstain", "query": "ما عقوبة التسول في قانون البلدية؟", "gloss": "What is the penalty for begging under the municipality law? (only its prevention is listed)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h16", "tier": "X", "type": "abstain", "query": "متى صادق الحاكم على قانون البلدية؟", "gloss": "When did the ruler ratify the municipality law? (only the civil service law's ratification is dated)", "relevant_passages": [], "expected": "abstain"}
+{"query_id": "h17", "tier": "G", "type": "fact", "query": "كم عدد الطيارين الذين تخرجوا؟", "gloss": "How many pilots graduated? (needs counting the list)", "relevant_passages": ["G2-p02", "G2-p01"]}
+{"query_id": "h18", "tier": "G", "type": "fact", "query": "ماذا حدث يوم ١٣ ديسمبر ١٩٥٤؟", "gloss": "What happened on 13 December 1954?", "relevant_passages": ["G1-p03", "G1-p05"]}
+{"query_id": "h19", "tier": "G", "type": "name", "query": "ساوثمبتن", "gloss": "Southampton", "relevant_passages": ["G2-p02"]}
+{"query_id": "h20", "tier": "G", "type": "table_row", "query": "من أين أبحرت الباخرة ايفاران؟", "gloss": "Where did the Ivaran sail from?", "relevant_passages": ["G3-p20"]}
+{"query_id": "h21", "tier": "G", "type": "fact", "query": "كم ساعة توقف العمل في الميناء بسبب الطقس؟", "gloss": "How many hours did port work stop because of the weather?", "relevant_passages": ["G3-p11"]}
+{"query_id": "h22", "tier": "G", "type": "name", "query": "عبدالعزيز البحر", "gloss": "Abdulaziz Al-Bahar", "relevant_passages": ["G2-p08"]}
+{"query_id": "h23", "tier": "G", "type": "fact", "query": "متى يبدأ توزيع الأحذية على التلاميذ؟", "gloss": "When does the distribution of shoes to pupils start?", "relevant_passages": ["G2-p07"]}
+{"query_id": "h24", "tier": "S", "type": "fact", "query": "هل يجوز للمغترب أن يعمل حلاقا؟", "gloss": "May an expatriate work as a barber?", "relevant_passages": ["S2-p10"]}
+{"query_id": "h25", "tier": "B", "type": "name", "query": "أبو حنيفة", "gloss": "Abu Hanifa", "relevant_passages": ["B1-p10"]}
+{"query_id": "h26", "tier": "B", "type": "name", "query": "من هو الشيخ عبدالله الجابر الصباح؟", "gloss": "Who is Sheikh Abdullah Al-Jaber Al-Sabah?", "relevant_passages": ["B1-p05"]}
