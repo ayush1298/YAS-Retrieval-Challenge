@@ -218,17 +218,16 @@ I compared four deciders on top of the same ranking, timed on an Apple M3 Max:
 | Decider | Provided (R@5 / R@10 / MRR) | Dev | Stress: correct abstentions | Stress: wrong abstentions | Time per query |
 |---|---|---|---|---|---|
 | A. bge-reranker evidence ≥ 0.1 (default) | 0.93 / 0.99 / 1.00 | 0.97 / 0.99 / 0.98 | 11/16 | 2/10 | 0.5 s |
-| B. Qwen3-Reranker-0.6B with an answerability instruction, as reranker and decider (yes-probability ≥ 0.5) | 0.85 / 0.91 / 0.92; **misses q12** | 0.97 / 0.99 / 0.99 | 13/16 | 1/10 | 4.7 s |
-| C. qwen3.5:4b verifies the top 3 for every query | 0.93 / 0.99 / 1.00 | 0.94 / 0.96 / 0.95 | 16/16 | 2/10 | slowest: up to 3 LLM calls on every query |
+| B. Qwen3-Reranker-0.6B with an answerability instruction, as reranker and decider (yes-probability ≥ 0.5) | 0.85 / 0.91 / 0.92; **misses q12** | 0.97 / 0.99 / 0.99 | 13/16 | 1/10 | 2.2 s |
+| C. qwen3.5:4b verifies the top 3 for every query | 0.93 / 0.99 / 1.00 | 0.94 / 0.96 / 0.95 | 16/16 | 2/10 | 2.2 s |
 | **D. Cascade: A when evidence ≥ 0.5, otherwise C** (`--verifier`) | **0.93 / 0.99 / 1.00** | **0.97 / 0.99 / 0.98** | **15/16** | 2/10 | 1.1 s |
 
 - **B** helps on the stress set but loses the one provided abstain query and hurts provided ranking.
 - **C** also rejects some correct answers (d03, which asks when the author met the Emir, is wrongly abstained).
 - **D** asks the LLM only when the reranker is unsure. It keeps both labelled sets exactly as they were and adds four correct abstentions.
 
-Three caveats:
+Two caveats:
 - The stress set has 16 unanswerable queries, so a difference of one or two queries is within noise.
-- Rows B and C were measured before two later parsing fixes (month names inside words, date handling). Those fixes left rows A and D unchanged, so I did not re-run B and C.
 - The verifier needs Ollama, so it stays opt-in and the default run keeps a single command with no extra services.
 
 ## Three failures
