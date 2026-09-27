@@ -15,14 +15,24 @@ def load_queries(path: Path) -> list[dict]:
         return [json.loads(line) for line in f if line.strip()]
 
 
+def _page(passage_id: str) -> str:
+    return passage_id.rsplit("-", 1)[0]
+
+
 def score(query: dict, result: Result) -> dict[str, float]:
     """Abstain queries score 1 on every metric when the system abstains and 0 otherwise;
-    answerable queries score 0 when it abstains. Page-level queries are scored on page IDs."""
+    answerable queries score 0 when it abstains. Page-level queries are scored on page IDs: the
+    returned pages, or the pages of the top 10 passages when the system answered with passages."""
     if query.get("expected") == "abstain":
         hit = float(result.mode == "abstain")
         return dict.fromkeys(METRICS, hit)
     relevant = set(query.get("relevant_pages") or query["relevant_passages"])
-    ranked = result.pages if query.get("relevant_pages") else result.passages
+    if not query.get("relevant_pages"):
+        ranked = result.passages
+    elif result.mode == "pages":
+        ranked = result.pages
+    else:
+        ranked = list(dict.fromkeys(_page(p) for p in result.passages[:10]))
     first = next((rank for rank, doc in enumerate(ranked, 1) if doc in relevant), None)
     return {
         "R@5": len(relevant & set(ranked[:5])) / len(relevant),

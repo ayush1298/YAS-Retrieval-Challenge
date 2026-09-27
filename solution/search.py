@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 
 from .corpus import load
-from .text import MONTHS, article_number, char_terms, date_span, expand_months, normalize, tokens, word_terms
+from .text import MONTHS, article_number, char_terms, date_span, expand_months, normalize, stem, tokens, word_terms
 
 EMBEDDER, EMBEDDER_REVISION = "BAAI/bge-m3", "5617a9f61b028005a4858fdac845db406aefb181"
 RERANKER, RERANKER_REVISION = "BAAI/bge-reranker-v2-m3", "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
@@ -27,9 +27,12 @@ CONFIDENT_EVIDENCE = 0.5  # with a verifier: below this, the LLM decides whether
 RELATIVE_PAGE_SCORE = 0.5  # without a reranker: page kept if within this fraction of the best page
 OLLAMA_CHAT = "http://localhost:11434/api/chat"
 
-_PUBLISHED = re.compile(r"\b(?:نشر|نشرت|ينشر|المنشور|منشور)\b|\b(?:ال)?(?:عدد|اعداد)\s+(?:يوم\s+)?\d")
+_ISSUE_DATE = re.compile(r"\b(?:ال)?(?:عدد|اعداد)\s+(?:يوم\s+)?\d")
 _EXHAUSTIVE = re.compile(r"\b(?:كل|جميع)\s+ما\b")
-_CUE_WORDS = frozenset("نشر نشرت ينشر المنشور منشور عدد العدد اعداد يوم".split())
+_PUBLISHED = frozenset(stem(t) for t in tokens("نشر نشرت ينشر تنشر نشره نشرها منشور المنشورة المنشورات"))
+_CUE_WORDS = _PUBLISHED | frozenset(stem(t) for t in tokens(
+    "عدد اعداد تم يوم لغاية مقال مقالات موضوع مواضيع صفحة صفحات السبت الأحد الاثنين الثلاثاء الأربعاء الخميس الجمعة"
+))
 
 
 @dataclass(frozen=True)
@@ -140,7 +143,7 @@ class _Index:
 
 
 def _is_topic_term(token: str) -> bool:
-    return token not in _CUE_WORDS and token not in MONTHS and not token.isdigit()
+    return stem(token) not in _CUE_WORDS and token not in MONTHS and not token.isdigit()
 
 
 def _minmax(x: np.ndarray) -> np.ndarray:
@@ -153,6 +156,7 @@ class Retriever:
         self.config = config
         self.pages, self.passages = load(data_dir)
         self.page_dates = {p.id: date.fromisoformat(p.date) for p in self.pages}
+        self.latest_year = max(self.page_dates.values()).year
         self.normalized_text = "\n".join(normalize(p.text) for p in self.passages)
         units = [(i, text) for i, p in enumerate(self.passages) for text in (p.units if config.layout else [p.text])]
         self.unit_texts = [text for _, text in units]
@@ -168,8 +172,10 @@ class Retriever:
 
     def search(self, query: str) -> Result:
         norm = normalize(query)
-        published = self.config.layout and bool(_PUBLISHED.search(norm))
-        span = date_span(query) if published else None
+        published = self.config.layout and (
+            bool(_ISSUE_DATE.search(norm)) or any(stem(t) in _PUBLISHED for t in tokens(query))
+        )
+        span = date_span(query, self.latest_year) if published else None
         if span or (self.config.layout and _EXHAUSTIVE.search(norm)):
             return self._search_pages(query, span)
 
@@ -203,9 +209,10 @@ class Retriever:
                 covered[self.unit_owner[unit]] = 1.0
         return covered
 
-    def _score(self, query: str) -> tuple[np.ndarray, np.ndarray | None]:
+    def _score(self, query: str, within: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray | None]:
         """Passage scores in [0, 1] and, when reranking, per-passage answer evidence: the reranker
-        probability, or 1 when the passage contains every query term."""
+        probability, or 1 when the passage contains every query term. `within` limits which
+        passages are reranked."""
         n = len(self.passages)
         channels = []
         for unit_scores in self.index.scores(query):
@@ -216,7 +223,8 @@ class Retriever:
 
         evidence = None
         if self.config.rerank:
-            top = set(np.argsort(-scores)[:RERANK_DEPTH])
+            candidates = scores if within is None else np.where(within, scores, -np.inf)
+            top = set(np.argsort(-candidates)[:RERANK_DEPTH])
             units = [u for u in range(len(self.unit_texts)) if self.unit_owner[u] in top]
             probs = _reranker().predict([(query, self.unit_texts[u]) for u in units], batch_size=16)
             relevance = np.zeros(n)
@@ -251,7 +259,7 @@ class Retriever:
             pages.sort(key=lambda p: (self.page_dates[p], p))
             return Result("pages", [q.id for q in self.passages if q.page in pages], pages)
 
-        scores, evidence = self._score(topic)
+        scores, evidence = self._score(topic, within=np.array([p.page in pages for p in self.passages]))
         page_evidence = scores if evidence is None else evidence
         order = [i for i in np.argsort(-scores, kind="stable") if self.passages[i].page in pages]
         best = defaultdict(float)

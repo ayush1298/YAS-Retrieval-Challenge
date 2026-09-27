@@ -1,7 +1,8 @@
 """Arabic normalisation, tokenisation and number/date parsing."""
 
 import re
-from datetime import date, timedelta
+from calendar import monthrange
+from datetime import date
 
 _DIACRITICS = re.compile(r"[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640]")
 _CHARS = str.maketrans(
@@ -62,27 +63,25 @@ ORDINALS = {w: i + 1 for i, group in enumerate(_UNITS.split()) for w in group.sp
 TENS = {w: 10 * (i + 2) for i, pair in enumerate(
     "عشرون|عشرين ثلاثون|ثلاثين اربعون|اربعين خمسون|خمسين ستون|ستين سبعون|سبعين ثمانون|ثمانين تسعون|تسعين".split()
 ) for w in pair.split("|")}
-_ARTICLE_REF = re.compile(r"\b(?:ال)?ماده\s+(?:رقم\s+)?(\d+|\S+(?:\s+\S+)?)")
+_ARTICLE_REF = re.compile(r"(?:^|\W)[وفبك]?(?:ال|لل)?ماده")
 
 
 def article_number(query: str) -> int | None:
-    """Article cited in a query: 'المادة ٢٥', 'المادة الثانية', 'المادة الخامسة والعشرون'."""
-    match = _ARTICLE_REF.search(normalize(query))
+    """Article cited in a query: 'المادة ٢٥', 'للمادة (٢٥)', 'المادة الثانية', 'المادة الخامسة و العشرون'."""
+    text = normalize(query)
+    match = _ARTICLE_REF.search(text)
     if not match:
         return None
-    words = [w.removeprefix("ال").removeprefix("وال") for w in match.group(1).split()]
-    if words[0].isdigit():
-        return int(words[0])
-    if words[0] in TENS:
-        return TENS[words[0]]
-    if words[0] not in ORDINALS:
+    following = _TOKEN.findall(text[match.end():])[:4]
+    words = [w.removeprefix("و").removeprefix("ال") for w in following if w not in ("و", "رقم")] or [""]
+    first, second = words[0], words[1] if len(words) > 1 else ""
+    if first.isdigit():
+        return int(first)
+    if first in TENS:
+        return TENS[first]
+    if first not in ORDINALS:
         return None
-    number = ORDINALS[words[0]]
-    if len(words) > 1 and words[1] in ("عشر", "عشره"):
-        number += 10
-    elif len(words) > 1 and words[1] in TENS:
-        number += TENS[words[1]]
-    return number
+    return ORDINALS[first] + (10 if second in ("عشر", "عشره") else TENS.get(second, 0))
 
 
 MONTHS = {
@@ -90,38 +89,60 @@ MONTHS = {
     "يوليو": 7, "يوليه": 7, "اغسطس": 8, "سبتمبر": 9, "اكتوبر": 10, "نوفمبر": 11, "ديسمبر": 12,
 }
 _MONTH = "|".join(MONTHS)
-_DAY_MONTH_YEAR = re.compile(rf"(?:\b(\d{{1,2}})\s*(?:و|الي|حتي|-)\s*)?\b(\d{{1,2}})?\s*({_MONTH})\s*(\d{{4}})?")
-_NUMERIC_DATE = re.compile(r"\b(\d{1,2})\s*[/-]\s*(\d{1,2})\s*[/-]\s*(\d{4})\b")
-_YEAR = re.compile(r"\b(1[89]\d\d)\b")
+_DAY_MONTH_YEAR = re.compile(
+    rf"(?:\b(\d{{1,2}})\s*(?:و|الي|حتي|لغايه|-|–)\s*)?\b(\d{{1,2}})?\s*({_MONTH})\s*(\d{{4}})?"
+)
+_NUMERIC_DATE = re.compile(r"\b(\d{1,2})\s*[/\-–]\s*(\d{1,2})\s*[/\-–]\s*(\d{4}|\d{2})\b")
+_YEAR = re.compile(r"\b(1[89]\d\d|20\d\d)\b")
 
 
-def _month_end(year: int, month: int) -> date:
-    return date(year + month // 12, month % 12 + 1, 1) - timedelta(days=1)
+def _valid_date(year: int, month: int, day: int) -> date:
+    """Nearest real date, so '31 November' or a month/day swap never raises."""
+    if month > 12 >= day:
+        month, day = day, month
+    year, month = max(year, 1), min(max(month, 1), 12)
+    return date(year, month, min(max(day, 1), monthrange(year, month)[1]))
 
 
-def date_span(query: str) -> tuple[date, date] | None:
-    """Calendar span mentioned in a query: a day, a month, a year or a range between two of them."""
+def _shift(day: date, years: int) -> date:
+    return _valid_date(day.year + years, day.month, day.day)
+
+
+def date_span(query: str, default_year: int | None = None) -> tuple[date, date] | None:
+    """Calendar span mentioned in a query: a day, a month, a year or a range between them. A date
+    without a year takes the nearest year written in the query, else `default_year`; a range that
+    would run backwards is read as crossing into the next year."""
     text = normalize(query)
-    years = _YEAR.findall(text)
-    spans = []
-    for first, day, month_name, year in _DAY_MONTH_YEAR.findall(text):
-        if not (year or years):
+    years = [(m.start(), int(m.group(1))) for m in _YEAR.finditer(text)]
+    mentions = []  # (start, end, year was inferred)
+    for m in _DAY_MONTH_YEAR.finditer(text):
+        first, day, month_name, year = m.groups()
+        later = [y for pos, y in years if pos > m.start()]
+        earlier = [y for pos, y in years if pos < m.start()]
+        inferred_year = later[0] if later else earlier[-1] if earlier else default_year
+        if not (year or inferred_year):
             continue
-        year, month = int(year or years[-1]), MONTHS[month_name]
-        if day:
-            spans.append((date(year, month, int(first or day)), date(year, month, int(day))))
-        else:
-            spans.append((date(year, month, 1), _month_end(year, month)))
+        year, month = int(year or inferred_year), MONTHS[month_name]
+        days = sorted(int(d) for d in (first, day) if d) or [1, monthrange(year, month)[1]]
+        mentions.append((_valid_date(year, month, days[0]), _valid_date(year, month, days[-1]), not m.group(4)))
+    for i in range(1, len(mentions)):
+        (start0, end0, inferred0), (start1, end1, inferred1) = mentions[i - 1], mentions[i]
+        if start1 < end0 and inferred1:
+            mentions[i] = (_shift(start1, 1), _shift(end1, 1), True)
+        elif start1 < end0 and inferred0:
+            mentions[i - 1] = (_shift(start0, -1), _shift(end0, -1), True)
+    century = (default_year or 1900) // 100 * 100
     for day, month, year in _NUMERIC_DATE.findall(text):
-        spans.append((date(int(year), int(month), int(day)),) * 2)
-    if not spans:
-        spans = [(date(int(y), 1, 1), date(int(y), 12, 31)) for y in _YEAR.findall(text)]
-    if not spans:
+        full_year = int(year) + (century if len(year) == 2 else 0)
+        mentions.append((_valid_date(full_year, int(month), int(day)),) * 2 + (False,))
+    if not mentions:
+        mentions = [(date(y, 1, 1), date(y, 12, 31), False) for _, y in years]
+    if not mentions:
         return None
-    return min(s for s, _ in spans), max(e for _, e in spans)
+    return min(m[0] for m in mentions), max(m[1] for m in mentions)
 
 
 def expand_months(query: str) -> str:
     """Append month numbers so 'ديسمبر' also matches dates written as '12/1954'."""
-    months = [str(MONTHS[m]) for m in re.findall(_MONTH, normalize(query))]
+    months = [str(MONTHS[m]) for m in re.findall(rf"\b(?:{_MONTH})\b", normalize(query))]
     return " ".join([query, *months])

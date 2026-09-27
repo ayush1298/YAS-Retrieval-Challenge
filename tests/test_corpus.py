@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from pathlib import Path
 
@@ -53,6 +54,21 @@ def test_table_cells_carry_header_and_caption(passages):
     assert row.context == "البواخر المنتظر وصولها من ١٨ - ١٢ لغاية ٢٤ – ١٢"
     assert "اسم الوكيل: يعقوب القطامي" in row.body
     assert "حمولتها بالأطنان: ٧٥٠٠ ( اسمنت)" in row.body
+
+
+def test_page_that_opens_with_a_table(tmp_path):
+    rows = [("اسم | تاريخ", True), ("دارا | ١٧ - ١٢", True), ("نص بعد الجدول.", False)]
+    (tmp_path / "pages.jsonl").write_text(json.dumps({"page_id": "T1", "publication_date": "1954-12-18"}), encoding="utf-8")
+    (tmp_path / "passages.jsonl").write_text(
+        "\n".join(
+            json.dumps({"passage_id": f"T1-p0{i}", "page_id": "T1", "position": i, "is_table_row": table, "text": text})
+            for i, (text, table) in enumerate(rows, 1)
+        ),
+        encoding="utf-8",
+    )
+    _, passages = load(tmp_path)
+    assert all(isinstance(p.section, int) for p in passages)
+    assert passages[1].body == "اسم: دارا | تاريخ: ١٧ - ١٢"
 
 
 def test_column_packed_table_is_rebuilt_in_scan_order(passages):

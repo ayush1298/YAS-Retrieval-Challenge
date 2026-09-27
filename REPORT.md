@@ -24,7 +24,7 @@ uv run solution evaluate                  # every table below: 4 configurations 
 uv run solution evaluate --details        # plus the ranking of each query
 uv run solution run held_out.jsonl        # one JSON line per query
 uv run solution search "قانون البلدية المادة ٢٥"
-uv run pytest                             # layout and query-parsing tests
+uv run pytest                             # layout, query-parsing, search-intent and metric tests
 ```
 
 Each result has:
@@ -61,9 +61,9 @@ R@5 / R@10 / MRR over all queries. Per-tier and per-type breakdowns follow.
 
 | Configuration | Provided (12) | Dev (34) | Stress (26) |
 |---|---|---|---|
-| BM25 (normalised, stemmed) | 0.59 / 0.71 / 0.67 | 0.75 / 0.80 / 0.73 | 0.33 / 0.37 / 0.31 |
-| Hybrid: + char n-grams + BGE-M3 | 0.68 / 0.79 / 0.72 | 0.76 / 0.81 / 0.72 | 0.37 / 0.38 / 0.32 |
-| + layout recovery and query intent | 0.85 / 0.89 / 0.88 | 0.91 / 0.93 / 0.91 | 0.44 / 0.44 / 0.42 |
+| BM25 (normalised, stemmed) | 0.59 / 0.69 / 0.67 | 0.75 / 0.77 / 0.72 | 0.33 / 0.37 / 0.31 |
+| Hybrid: + char n-grams + BGE-M3 | 0.68 / 0.77 / 0.72 | 0.75 / 0.78 / 0.72 | 0.37 / 0.38 / 0.32 |
+| + layout recovery and query intent | 0.85 / 0.89 / 0.88 | 0.91 / 0.93 / 0.89 | 0.44 / 0.44 / 0.42 |
 | + reranking and abstention (default) | **0.93 / 0.99 / 1.00** | **0.97 / 0.99 / 0.98** | 0.73 / 0.73 / 0.71 |
 | + qwen3.5:4b verifier (`--verifier`) | 0.93 / 0.99 / 1.00 | 0.97 / 0.99 / 0.98 | **0.88 / 0.88 / 0.86** |
 
@@ -95,7 +95,7 @@ I wrote the dev queries before building the retrieval stack and then used them d
 
 - **Recall@k:** |relevant ∩ top k| / |relevant|.
 - **MRR:** 1 / rank of the first relevant result, or 0 if none is returned.
-- **What gets ranked:** queries with `relevant_pages` are scored on the returned page list; all others are scored on the passage list.
+- **What gets ranked:** passage queries are scored on the passage list. Page queries (`relevant_pages`) are scored on the returned pages; a configuration that answers them with passages instead (`bm25`, `hybrid`) is scored on the pages of its top 10 passages and returns no page set.
 - **Abstain queries:** score 1 on every metric when the system abstains and 0 otherwise.
 - **Answerable queries:** score 0 when the system abstains, so false abstentions count in every table below.
 - **Ceilings:** some queries have more than 5 or 10 relevant passages, which caps their recall.
@@ -112,8 +112,8 @@ Cells: R@5 / R@10 / MRR
 | Bronze | 3 | 0.76 / 0.81 / 0.83 | 0.76 / 0.81 / 1.00 | 0.90 / 0.90 / 1.00 | 0.90 / 1.00 / 1.00 |
 | Silver | 3 | 0.70 / 0.70 / 1.00 | 0.70 / 0.70 / 1.00 | 0.82 / 0.97 / 1.00 | 0.82 / 0.97 / 1.00 |
 | Gold | 3 | 0.33 / 0.67 / 0.39 | 0.67 / 1.00 / 0.43 | 1.00 / 1.00 / 0.83 | 1.00 / 1.00 / 1.00 |
-| Cross-tier | 3 | 0.58 / 0.67 / 0.44 | 0.58 / 0.67 / 0.44 | 0.67 / 0.67 / 0.67 | 1.00 / 1.00 / 1.00 |
-| All | 12 | 0.59 / 0.71 / 0.67 | 0.68 / 0.79 / 0.72 | 0.85 / 0.89 / 0.88 | 0.93 / 0.99 / 1.00 |
+| Cross-tier | 3 | 0.58 / 0.58 / 0.44 | 0.58 / 0.58 / 0.44 | 0.67 / 0.67 / 0.67 | 1.00 / 1.00 / 1.00 |
+| All | 12 | 0.59 / 0.69 / 0.67 | 0.68 / 0.77 / 0.72 | 0.85 / 0.89 / 0.88 | 0.93 / 0.99 / 1.00 |
 
 | Type | n | bm25 | hybrid | hybrid+layout | hybrid+layout+rerank |
 |---|---|---|---|---|---|
@@ -123,7 +123,7 @@ Cells: R@5 / R@10 / MRR
 | list | 1 | 0.09 / 0.09 / 1.00 | 0.09 / 0.09 / 1.00 | 0.45 / 0.91 / 1.00 | 0.45 / 0.91 / 1.00 |
 | table_row | 2 | 0.00 / 0.50 / 0.09 | 0.50 / 1.00 / 0.15 | 1.00 / 1.00 / 0.75 | 1.00 / 1.00 / 1.00 |
 | exhaustive | 1 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
-| date_range | 1 | 0.75 / 1.00 / 0.33 | 0.75 / 1.00 / 0.33 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
+| date_range | 1 | 0.75 / 0.75 / 0.33 | 0.75 / 0.75 / 0.33 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
 | abstain | 1 | 0.00 / 0.00 / 0.00 | 0.00 / 0.00 / 0.00 | 0.00 / 0.00 / 0.00 | 1.00 / 1.00 / 1.00 |
 
 ## Results: dev queries
@@ -131,21 +131,21 @@ Cells: R@5 / R@10 / MRR
 | Tier | n | bm25 | hybrid | hybrid+layout | hybrid+layout+rerank |
 |---|---|---|---|---|---|
 | Bronze | 7 | 0.82 / 0.83 / 0.83 | 0.82 / 0.87 / 0.90 | 0.94 / 1.00 / 0.90 | 0.94 / 1.00 / 0.90 |
-| Silver | 8 | 0.71 / 0.80 / 0.77 | 0.76 / 0.81 / 0.75 | 0.91 / 0.95 / 0.94 | 0.91 / 0.95 / 1.00 |
+| Silver | 8 | 0.76 / 0.80 / 0.75 | 0.76 / 0.81 / 0.74 | 0.91 / 0.95 / 0.88 | 0.91 / 0.95 / 1.00 |
 | Gold | 11 | 1.00 / 1.00 / 0.84 | 1.00 / 1.00 / 0.79 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
-| Cross-tier | 8 | 0.39 / 0.50 / 0.44 | 0.39 / 0.50 / 0.44 | 0.75 / 0.75 / 0.75 | 1.00 / 1.00 / 1.00 |
-| All | 34 | 0.75 / 0.80 / 0.73 | 0.76 / 0.81 / 0.72 | 0.91 / 0.93 / 0.91 | 0.97 / 0.99 / 0.98 |
+| Cross-tier | 8 | 0.36 / 0.36 / 0.44 | 0.36 / 0.36 / 0.44 | 0.75 / 0.75 / 0.75 | 1.00 / 1.00 / 1.00 |
+| All | 34 | 0.75 / 0.77 / 0.72 | 0.75 / 0.78 / 0.72 | 0.91 / 0.93 / 0.89 | 0.97 / 0.99 / 0.98 |
 
 | Type | n | bm25 | hybrid | hybrid+layout | hybrid+layout+rerank |
 |---|---|---|---|---|---|
-| fact | 12 | 1.00 / 1.00 / 0.81 | 1.00 / 1.00 / 0.83 | 1.00 / 1.00 / 0.94 | 1.00 / 1.00 / 0.94 |
+| fact | 12 | 1.00 / 1.00 / 0.79 | 1.00 / 1.00 / 0.83 | 1.00 / 1.00 / 0.90 | 1.00 / 1.00 / 0.94 |
 | name | 3 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
 | topic | 1 | 0.22 / 0.33 / 1.00 | 0.22 / 0.33 / 1.00 | 0.56 / 1.00 / 1.00 | 0.56 / 1.00 / 1.00 |
-| list | 3 | 0.32 / 0.54 / 0.83 | 0.43 / 0.67 / 0.83 | 0.77 / 0.88 / 0.83 | 0.77 / 0.88 / 1.00 |
+| list | 3 | 0.43 / 0.54 / 0.83 | 0.43 / 0.67 / 0.83 | 0.77 / 0.88 / 0.83 | 0.77 / 0.88 / 1.00 |
 | exact_citation | 2 | 0.62 / 0.62 / 0.67 | 0.62 / 0.62 / 0.60 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
 | table_row | 5 | 1.00 / 1.00 / 0.75 | 1.00 / 1.00 / 0.67 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
 | exhaustive | 2 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
-| date_range | 2 | 0.55 / 1.00 / 0.75 | 0.55 / 1.00 / 0.75 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
+| date_range | 2 | 0.45 / 0.45 / 0.75 | 0.45 / 0.45 / 0.75 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
 | abstain | 4 | 0.00 / 0.00 / 0.00 | 0.00 / 0.00 / 0.00 | 0.50 / 0.50 / 0.50 | 1.00 / 1.00 / 1.00 |
 
 With the verifier, the provided and dev tables are identical to the default column.
@@ -184,15 +184,15 @@ The configurations without a reranker never abstain on evidence, so they answer 
 **Exhaustive.**
 
 - **Trigger:** `كل ما …` or `جميع ما …` ("everything that …").
-- **What the system does:** it removes the cue words and searches the remaining topic like any other query. A page is returned when at least one of its passages carries answer evidence (the same test as abstention, below), and pages are ranked by their best passage.
+- **What the system does:** it removes the cue words and searches the remaining topic like any other query. A page is returned when at least one of its passages carries answer evidence (reranker probability ≥ 0.1, or every topic term in one passage; the optional verifier is not used for pages), and pages are ranked by their best passage.
 - **Scoring:** the ranked page list gets R@k / MRR, and the returned set gets precision / recall.
 - **Results:** q10 (audit office) returns B3, B2; d28 (shipping) returns G3. d27 (municipality law) returns S1 and S3, although S3 never contains the phrase `قانون البلدية`: its passages match through their recovered heading `اختصاصات المجلس البلدي` and the article 23 lead-in. Precision and recall are 1.00 / 1.00 on all three.
 
 **Date range.**
 
-- **Trigger:** a publication cue (`نشر` and its forms, or `عدد` directly followed by a date) plus a date.
-- **Parsed forms:** day-month-year, month-year, year alone, numeric dates, and ranges (`بين ١٨ و ٢٥ ديسمبر ١٩٥٤`, `من … الى …`).
-- **What the system does:** it filters pages on `publication_date`.
+- **Trigger:** a publication cue (forms of `نشر` such as `نشره`, `المنشورة`, or `عدد` directly followed by a date) plus a date. Other wording around the date (`تم`, `لغاية`, weekday names, `المقالات`) is not treated as a topic.
+- **Parsed forms:** day-month-year, month-year, year alone, numeric dates (`/`, `-` or `–`, two- or four-digit year), and ranges (`بين ١٨ و ٢٥ ديسمبر ١٩٥٤`, `١٨–٢٥ ديسمبر`, `من … الى …`, `لغاية`), including reversed ranges and ranges that cross a year. A date without a year takes the nearest year in the query, else the latest publication year in the collection. An impossible date (`٣١ نوفمبر`) is moved to the nearest real one, so it matches no issue instead of failing.
+- **What the system does:** it filters pages on `publication_date`, and reranks only passages from those pages.
   - With no other topic words, it returns every page in the span, ordered by date.
   - With topic words left, it ranks that topic inside the span, as for exhaustive queries.
   - An empty span abstains (d34, 1 January 1955).
@@ -226,8 +226,9 @@ I compared four deciders on top of the same ranking, timed on an Apple M3 Max:
 - **C** also rejects some correct answers (d03, which asks when the author met the Emir, is wrongly abstained).
 - **D** asks the LLM only when the reranker is unsure. It keeps both labelled sets exactly as they were and adds four correct abstentions.
 
-Two caveats:
+Three caveats:
 - The stress set has 16 unanswerable queries, so a difference of one or two queries is within noise.
+- Rows B and C were measured before two later parsing fixes (month names inside words, date handling). Those fixes left rows A and D unchanged, so I did not re-run B and C.
 - The verifier needs Ollama, so it stays opt-in and the default run keeps a single command with no extra services.
 
 ## Three failures

@@ -130,14 +130,15 @@ def _layout_prose(passages: list[Passage], count: int) -> int:
     """Assign sections (split at headings, notice bullets and tables) and give each passage the
     heading, law article and list lead-in it sits under. Prose after a table resumes the section
     the table interrupted."""
-    section = heading = None
+    count += 1
+    section, heading = count, ""
     article_lead = list_lead = ""
     article, was_table, resume = None, False, None
     for i, p in enumerate(passages):
         lines = [line.strip() for line in p.text.split("\n") if line.strip()]
         titles = _heading_lines(lines, page_start=i == 0)
         table_starts = p.is_table_row and not was_table
-        if titles or _BULLET.match(lines[0]) or section is None or table_starts:
+        if titles or _BULLET.match(lines[0]) or table_starts:
             if table_starts:
                 resume = section, heading
             count += 1
